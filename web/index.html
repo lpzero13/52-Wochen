@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101711" />
+    <title>52W High Research</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#screener" aria-label="52W High Research Startseite">
+          <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+          <span><strong>52W</strong><small>HIGH RESEARCH</small></span>
+        </a>
+        <div class="sidebar-label">RESEARCH</div>
+        <nav class="primary-nav" aria-label="Hauptnavigation">
+          <button class="nav-item active" data-view="screener" aria-label="Screener" title="Screener"><span class="nav-icon">⌕</span><span>Screener</span></button>
+          <button class="nav-item" data-view="backtests" aria-label="Backtests" title="Backtests"><span class="nav-icon">▥</span><span>Backtests</span></button>
+          <button class="nav-item" data-view="methodik" aria-label="Methodik und Daten" title="Methodik &amp; Daten"><span class="nav-icon">◎</span><span>Methodik &amp; Daten</span></button>
+        </nav>
+        <div class="sidebar-spacer"></div>
+        <div class="side-note">
+          <span class="pulse-dot"></span>
+          <div><strong>Lokales Research</strong><small>Nur Norgate-Kursdaten</small></div>
+        </div>
+        <div class="sidebar-foot">EIGENSTÄNDIGES PROJEKT<br />KEIN MOMENTUM-SCORE</div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="mobile-brand"><span class="brand-mark"><span></span><span></span><span></span><span></span></span><strong>52W HIGH</strong></div>
+          <div class="breadcrumbs"><span>RESEARCH</span><i>/</i><strong id="crumb-current">SCREENER</strong></div>
+          <div class="topbar-right">
+            <span class="data-indicator" id="data-indicator"><i></i><span>Datenstand wird geprüft</span></span>
+            <button class="icon-button" id="refresh-button" title="Ansicht aktualisieren" aria-label="Ansicht aktualisieren">↻</button>
+          </div>
+        </header>
+        <nav class="mobile-nav" aria-label="Hauptnavigation">
+          <button class="active" data-view="screener" aria-label="Screener"><span>⌕</span> Screener</button>
+          <button data-view="backtests" aria-label="Backtests"><span>▥</span> Backtests</button>
+          <button data-view="methodik" aria-label="Methodik und Daten"><span>◎</span> Methodik</button>
+        </nav>
+
+        <div class="content-wrap">
+          <div class="source-alert hidden" id="source-alert" role="status"></div>
+
+          <section class="view active" id="view-screener">
+            <div class="page-intro">
+              <div>
+                <div class="eyebrow"><span class="eyebrow-line"></span> 52-WOCHEN-HOCH ANALYSE</div>
+                <h1>Wer steht kurz vor dem Hoch?</h1>
+                <p class="lede">Finde Aktien nahe ihrem rollierenden 52‑Wochen‑Hoch — heute oder an einem historischen Stichtag.</p>
+              </div>
+              <div class="snapshot-stamp"><span class="stamp-icon">◷</span><span><small>MARKTSTICHTAG</small><strong id="snapshot-stamp">—</strong></span></div>
+            </div>
+
+            <form class="filter-bar" id="screener-form">
+              <label class="filter-field"><span>UNIVERSUM</span><select id="universe-select"><option value="sp500">S&amp;P 500</option><option value="nasdaq100">Nasdaq 100</option><option value="dow">Dow Jones 30</option></select></label>
+              <label class="filter-field date-field"><span>STICHTAG</span><input type="date" id="as-of-date" required /></label>
+              <label class="filter-field"><span>MAX. ABSTAND ZUM HOCH</span><select id="threshold-select"><option value="1">1 %</option><option value="3">3 %</option><option value="5" selected>5 %</option><option value="10">10 %</option><option value="15">15 %</option></select></label>
+              <button class="button button-primary" type="submit"><span>Analyse laden</span><b>→</b></button>
+            </form>
+
+            <div class="effective-date-note hidden" id="effective-date-note"></div>
+            <div class="stat-grid" id="screener-stats">
+              <article class="stat-card stat-card-dark"><div class="stat-label">IM UNIVERSUM</div><div class="stat-value" id="stat-members">—</div><div class="stat-foot">historische Indexmitglieder</div><span class="stat-glyph">◉</span></article>
+              <article class="stat-card"><div class="stat-label">AUSWERTBAR</div><div class="stat-value" id="stat-eligible">—</div><div class="stat-foot">mit 252 gültigen Sitzungen</div><span class="stat-glyph muted">▤</span></article>
+              <article class="stat-card stat-card-accent"><div class="stat-label">NAHE AM HOCH</div><div class="stat-value" id="stat-near">—</div><div class="stat-foot">innerhalb des gewählten Abstands</div><span class="stat-glyph">↗</span></article>
+              <article class="stat-card"><div class="stat-label">AUSGESCHLOSSEN</div><div class="stat-value" id="stat-excluded">—</div><div class="stat-foot">Kurslücken oder zu kurze Historie</div><span class="stat-glyph muted">⊘</span></article>
+            </div>
+
+            <div class="section-heading table-heading">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> MARKTÜBERSICHT</div><h2>Abstand zum 52‑Wochen‑Hoch</h2></div>
+              <div class="table-tools"><label class="search-box"><span>⌕</span><input type="search" id="ticker-search" placeholder="Ticker oder Name suchen" /></label><label class="checkbox-inline"><input type="checkbox" id="near-only" /><span>Nur nahe am Hoch</span></label></div>
+            </div>
+            <div class="table-shell">
+              <div class="table-overflow">
+                <table class="data-table" id="screener-table">
+                  <thead><tr><th>WERTPAPIER</th><th class="num">LETZTER KURS</th><th class="num">52W-HOCH</th><th class="num">ABSTAND</th><th class="num">52W-TIEF</th><th class="num">3 MON.</th><th class="num">6 MON.</th><th class="num">12 MON.</th><th></th></tr></thead>
+                  <tbody id="screener-rows"><tr><td colspan="9" class="empty-state"><span class="loader"></span> Daten werden geladen …</td></tr></tbody>
+                </table>
+              </div>
+              <div class="table-footer"><span id="table-count">Noch keine Daten geladen</span><span>Sortiert nach Nähe zum Hoch <b>↓</b></span></div>
+            </div>
+            <div class="disclaimer-line"><span>ⓘ</span><span>Die 52‑Wochen-Kennzahlen verwenden Total-Return-adjustierte Norgate-OHLC-Daten. Historische Screens verwenden die für den jeweiligen Tag gespeicherten Indexmitglieder.</span><button data-view="methodik" class="text-link">Details zur Datenbasis →</button></div>
+          </section>
+
+          <section class="view" id="view-backtests">
+            <div class="page-intro">
+              <div><div class="eyebrow"><span class="eyebrow-line"></span> HISTORISCHE EREIGNISSTUDIE</div><h1>Was geschah nach dem Signal?</h1><p class="lede">Vergleiche Nähe-zum-Hoch-Signale mit Aktien derselben Indextermine, die deutlich weiter vom Hoch entfernt waren.</p></div>
+              <div class="snapshot-stamp"><span class="stamp-icon">↗</span><span><small>BACKTEST-TYP</small><strong>Signalvergleich</strong></span></div>
+            </div>
+            <div class="study-explainer"><span class="explainer-icon">i</span><p><strong>Keine simulierte Depotkurve:</strong> Jeder Treffer ist ein separates Ereignis. Renditen werden ab dem nächsten Handelstag gemessen; wiederholte und überlappende Signale bleiben in der Auswertung und sind nicht unabhängig.</p><button data-view="methodik" class="text-link">So wird gerechnet →</button></div>
+            <div class="backtest-layout">
+              <form class="panel backtest-form" id="backtest-form">
+                <div class="panel-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> STUDIE KONFIGURIEREN</div><h2>Testparameter</h2></div><span class="step-badge">01</span></div>
+                <div class="form-grid two-col">
+                  <label class="filter-field"><span>UNIVERSUM</span><select id="bt-universe"><option value="sp500">S&amp;P 500</option><option value="nasdaq100">Nasdaq 100</option><option value="dow">Dow Jones 30</option></select></label>
+                  <label class="filter-field"><span>SCAN-FREQUENZ</span><select id="bt-frequency"><option value="monthly">Monatlich</option><option value="weekly">Wöchentlich</option><option value="daily">Täglich</option></select></label>
+                  <label class="filter-field"><span>VON</span><input type="date" id="bt-start-date" required /></label>
+                  <label class="filter-field"><span>BIS</span><input type="date" id="bt-end-date" required /></label>
+                </div>
+                <div class="form-block"><span class="field-caption">ABSTAND ZUM 52W-HOCH <small>(IN PROZENT)</small></span><div class="choice-row" id="threshold-choices"><label class="choice-chip"><input type="checkbox" value="1" checked /><span>1 %</span></label><label class="choice-chip"><input type="checkbox" value="3" checked /><span>3 %</span></label><label class="choice-chip"><input type="checkbox" value="5" checked /><span>5 %</span></label><label class="choice-chip"><input type="checkbox" value="10" checked /><span>10 %</span></label></div><small class="field-help">Jeder Abstand wird separat mit derselben Vergleichsgruppe ausgewertet.</small></div>
+                <div class="form-block"><span class="field-caption">HALTEDAUER <small>(HANDELSSITZUNGEN)</small></span><div class="choice-row" id="horizon-choices"><label class="choice-chip"><input type="checkbox" value="21" checked /><span>21 <small>~1M</small></span></label><label class="choice-chip"><input type="checkbox" value="63" checked /><span>63 <small>~3M</small></span></label><label class="choice-chip"><input type="checkbox" value="126" checked /><span>126 <small>~6M</small></span></label><label class="choice-chip"><input type="checkbox" value="252" checked /><span>252 <small>~12M</small></span></label></div></div>
+                <div class="form-grid two-col compact-grid">
+                  <label class="filter-field"><span>VERGLEICH: ABSTAND AB</span><div class="input-suffix"><input type="number" id="control-min" value="15" min="1" max="49" step="1" /><em>%</em></div></label>
+                  <label class="filter-field"><span>VERGLEICH: ABSTAND BIS</span><div class="input-suffix"><input type="number" id="control-max" value="25" min="2" max="50" step="1" /><em>%</em></div></label>
+                  <label class="filter-field"><span>KOSTEN JE SEITE</span><div class="input-suffix"><input type="number" id="cost-bps" value="25" min="0" max="1000" step="5" /><em>bps</em></div></label>
+                </div>
+                <div class="form-error hidden" id="backtest-error"></div>
+                <button class="button button-primary run-button" type="submit"><span>Backtest berechnen</span><b>↗</b></button>
+                <div class="runtime-note"><span>◷</span> Größere Zeiträume oder tägliche Scans können einige Minuten dauern.</div>
+              </form>
+              <div class="results-column">
+                <div id="backtest-results" class="panel results-panel">
+                  <div class="results-placeholder"><span class="placeholder-graphic">▥</span><h2>Noch keine Studie ausgewählt</h2><p>Lege Zeitraum, Nähe zum Hoch und Haltedauer fest. Deine Ergebnisse werden hier angezeigt und lokal für den Vergleich gespeichert.</p></div>
+                </div>
+                <div class="panel history-panel"><div class="panel-heading history-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> DEINE STUDIEN</div><h2>Gespeicherte Backtests</h2></div><span class="history-count" id="history-count">0</span></div><div id="backtest-history" class="history-list"><div class="history-empty">Noch keine Backtests gespeichert.</div></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-methodik">
+            <div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRANSPARENZ</div><h1>Methodik &amp; Daten</h1><p class="lede">Was dieses Werkzeug misst — und wo seine Aussagekraft endet.</p></div><div class="snapshot-stamp"><span class="stamp-icon">◎</span><span><small>DATENQUELLE</small><strong>Norgate lokal</strong></span></div></div>
+            <div class="method-grid">
+              <article class="panel method-card method-card-wide"><div class="method-number">01</div><div><div class="eyebrow">DIE FRAGE</div><h2>Ist ein Einstieg nahe dem Jahreshoch vorteilhaft?</h2><p>Das Projekt untersucht, wie sich Aktien nach einem Schlusskurs nahe ihrem höchsten Tageshoch aus den letzten 252 Handelssitzungen entwickelt haben. Es berechnet keine Momentum-Scores, Signale oder Rankings aus einem anderen Projekt.</p></div></article>
+              <article class="panel method-card"><div class="method-number">02</div><div><div class="eyebrow">52-WOCHEN-HOCH</div><h2>252 Handelssitzungen</h2><p>Für jeden Stichtag wird das Maximum der adjustierten Tageshochs aus den letzten 252 Indexsitzungen einschließlich des Stichtags verwendet. Der Abstand lautet: Schlusskurs ÷ 52W-Hoch − 1.</p></div></article>
+              <article class="panel method-card"><div class="method-number">03</div><div><div class="eyebrow">EINSTIEG &amp; AUSSTIEG</div><h2>Nächster Open, späterer Close</h2><p>Ein Signal entsteht am Schluss des Stichtags. Der Referenzeinstieg erfolgt am nächsten Handelstag zum adjustierten Eröffnungskurs. Der Ausstieg erfolgt zum Schluss nach 21, 63, 126 oder 252 Sitzungen ab dem Signal.</p></div></article>
+              <article class="panel method-card"><div class="method-number">04</div><div><div class="eyebrow">VERGLEICHSGRUPPE</div><h2>Gleicher Index, gleicher Termin</h2><p>Als grobe Kontrolle dienen Mitglieder desselben Index am selben Signaltermin, deren Schlusskurs 15–25 % unter dem jeweiligen 52W-Hoch liegt. Der Bereich lässt sich ändern. Diese Gruppe ist nicht risikogleich und beweist keine Kausalität.</p></div></article>
+              <article class="panel method-card"><div class="method-number">05</div><div><div class="eyebrow">KOSTEN</div><h2>Je Seite abgezogen</h2><p>Die gewählten Basispunkte werden beim Kauf und Verkauf berücksichtigt. Steuern, tatsächliche Geld-Brief-Spannen, Slippage, Finanzierung und die Stückzahl realer Aktien werden nicht rekonstruiert.</p></div></article>
+              <article class="panel method-card method-card-wide source-method"><div class="method-number">06</div><div><div class="eyebrow">QUELLE &amp; GRENZEN</div><h2>Norgate Total Return — mit sichtbaren Einschränkungen</h2><p>Kurse und historische Indexmitgliedschaften stammen aus der lokalen Norgate-SQLite-Datei. Das Exportmanifest ist als unvollständig markiert; fehlende Kurse oder Indexmitglieder können daher Ergebnisse verzerren. Die App zählt ausgeschlossene Werte und zeigt Datenwarnungen. Point-in-Time-Mitgliedschaften sind die in dieser Datei gespeicherten Stände; frühere Datenrevisionen sind nicht archiviert.</p><p>Die Total-Return-adjustierten OHLC-Werte sind synthetische Referenzpreise und keine Rekonstruktion tatsächlich gehandelter Stücke. Dividendenzahlungen, Splits und Ausführungen im realen Markt werden nicht einzeln nachgebildet. Überlappende Signale sind nicht unabhängig; alle Kennzahlen sind deskriptiv, ohne Out-of-Sample-Nachweis.</p></div></article>
+            </div>
+            <div class="independence-note"><span>⌂</span><div><strong>Eigenständige Anwendung</strong><p>Dieses Projekt liest die Norgate-Datenbank ausschließlich im Nur-Lesen-Modus. Ergebnisse und Einstellungen werden in einer separaten lokalen Datenbank gespeichert.</p><code id="source-file-label">Datenquelle: wird geladen …</code></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="detail-backdrop">
+      <aside class="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <button class="drawer-close" id="detail-close" aria-label="Schließen">×</button>
+        <div class="drawer-loading" id="detail-content"><span class="loader"></span> Kursverlauf wird geladen …</div>
+      </aside>
+    </div>
+    <div class="toast hidden" id="toast" role="status"></div>
+  </body>
+</html>
