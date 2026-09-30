@@ -14,6 +14,7 @@ Das Produkt beginnt unabhängig und frisch. Es importiert keinen Programmcode, k
 4. Backtests mit verschiedenen Abständen, Haltedauern, Scan-Frequenzen, Zeiträumen, Kontrollabständen und Kosten konfigurieren.
 5. Studien lokal speichern, Ergebnisse vergleichen und Signalereignisse als CSV exportieren.
 6. Über einen lokalen MCP-Server oder die REST-API Parametersuchen an einen Agenten übergeben und Varianten anhand eines zeitlich getrennten Prüfzeitraums ordnen.
+7. Den aktuellen Scanner ohne Norgate-Abonnement mit kostenlosen EOD-Daten aktualisieren. Historische Studien bleiben auf der Norgate-Historie.
 
 ## Definitionen
 
@@ -42,6 +43,9 @@ Die Norgate-Preise sind Total-Return-adjustierte OHLC-Referenzdaten. Die Anwendu
 - Aktien ohne 252 gültige tägliche OHLC-Beobachtungen werden aus der jeweiligen Screener-Zeile ausgeschlossen und gezählt.
 - Für eine einzelne Studie werden fehlende OHLC-Werte in der Signalhistorie ausgeschlossen; fehlende Zukunftskurse machen nur den jeweiligen Horizont nicht verfügbar.
 - Das beim Export gespeicherte Point-in-Time-Universum wird verwendet. Nachträgliche Norgate-Datenrevisionen sind nicht archiviert.
+- Für den aktuellen Stand existiert ein getrennter Yahoo-Cache mit etwa zwei Jahren vollständig neu bereinigter OHLC-Historie. Heutige Nasdaq-Mitglieder und datierte SPY-/DIA-Holdings-Proxies werden nur dem aktuellen Snapshot zugeordnet, nicht rückwirkend in die Vergangenheit geschrieben. Backtests und Optimierungen verwenden diesen Cache nicht.
+- Kostenlose Originaldaten, Quellstichtage und Beobachtungszeitpunkte werden je Abruf archiviert. Ein fehlender historischer Mitgliederstand nach dem Norgate-Ende wird im historischen Screener abgelehnt.
+- Neue EOD-Stände werden erst zwei Stunden nach Börsenschluss laut NYSE-Kalender akzeptiert. Pro Universum sind mindestens 95 % aktuelle gültige Kursreihen erforderlich. Fehlgeschlagene Updates lassen den vorherigen Cache unverändert.
 
 ## Speicherung und Betrieb
 
@@ -51,4 +55,4 @@ Eine Parametersuche vergleicht die getesteten Abstände und Haltedauern sowie au
 
 ## Umfang außerhalb der Version 1
 
-Keine Verbindung zu Momentum- oder sonstiger Projektruntime, keine Brokerorders, keine Kursdaten außerhalb der Norgate-Datei, keine Portfolio-/Kapital-Simulation und keine Behauptung, die Nähe zum Hoch sei allein eine Kaufempfehlung.
+Keine Verbindung zu Momentum- oder sonstiger Projektruntime, keine Brokerorders, keine rückwirkende Ersetzung historischer Indexmitglieder durch heutige Listen, keine Portfolio-/Kapital-Simulation und keine Behauptung, die Nähe zum Hoch sei allein eine Kaufempfehlung. Kostenlose Updates ersetzen keine vollständige delisting- und corporate-action-bereinigte Point-in-Time-Datenbank.

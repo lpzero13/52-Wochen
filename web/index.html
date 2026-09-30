@@ -28,7 +28,7 @@
         <div class="sidebar-spacer"></div>
         <div class="side-note">
           <span class="pulse-dot"></span>
-          <div><strong>Lokales Research</strong><small>Nur Norgate-Kursdaten</small></div>
+          <div><strong>Lokales Research</strong><small>Norgate-Historie + kostenlose Updates</small></div>
         </div>
         <div class="sidebar-foot">EIGENSTÄNDIGES PROJEKT<br />KEIN MOMENTUM-SCORE</div>
       </aside>
@@ -39,6 +39,7 @@
           <div class="breadcrumbs"><span>RESEARCH</span><i>/</i><strong id="crumb-current">SCREENER</strong></div>
           <div class="topbar-right">
             <span class="data-indicator" id="data-indicator"><i></i><span>Datenstand wird geprüft</span></span>
+            <button class="text-link" id="free-update-button" title="Kostenlose Schlusskurse herunterladen">Kurse aktualisieren</button>
             <button class="icon-button" id="refresh-button" title="Ansicht aktualisieren" aria-label="Ansicht aktualisieren">↻</button>
           </div>
         </header>
@@ -70,7 +71,7 @@
 
             <div class="effective-date-note hidden" id="effective-date-note"></div>
             <div class="stat-grid" id="screener-stats">
-              <article class="stat-card stat-card-dark"><div class="stat-label">IM UNIVERSUM</div><div class="stat-value" id="stat-members">—</div><div class="stat-foot">historische Indexmitglieder</div><span class="stat-glyph">◉</span></article>
+              <article class="stat-card stat-card-dark"><div class="stat-label">IM UNIVERSUM</div><div class="stat-value" id="stat-members">—</div><div class="stat-foot" id="member-basis">Indexmitglieder am Stichtag</div><span class="stat-glyph">◉</span></article>
               <article class="stat-card"><div class="stat-label">AUSWERTBAR</div><div class="stat-value" id="stat-eligible">—</div><div class="stat-foot">mit 252 gültigen Sitzungen</div><span class="stat-glyph muted">▤</span></article>
               <article class="stat-card stat-card-accent"><div class="stat-label">NAHE AM HOCH</div><div class="stat-value" id="stat-near">—</div><div class="stat-foot">innerhalb des gewählten Abstands</div><span class="stat-glyph">↗</span></article>
               <article class="stat-card"><div class="stat-label">AUSGESCHLOSSEN</div><div class="stat-value" id="stat-excluded">—</div><div class="stat-foot">Kurslücken oder zu kurze Historie</div><span class="stat-glyph muted">⊘</span></article>
@@ -89,7 +90,8 @@
               </div>
               <div class="table-footer"><span id="table-count">Noch keine Daten geladen</span><span>Sortiert nach Nähe zum Hoch <b>↓</b></span></div>
             </div>
-            <div class="disclaimer-line"><span>ⓘ</span><span>Die 52‑Wochen-Kennzahlen verwenden Total-Return-adjustierte Norgate-OHLC-Daten. Historische Screens verwenden die für den jeweiligen Tag gespeicherten Indexmitglieder.</span><button data-view="methodik" class="text-link">Details zur Datenbasis →</button></div>
+            <div class="disclaimer-line"><span>ⓘ</span><span id="screen-price-basis">Historische Screens: Norgate mit gespeicherten Indexmitgliedern. Aktueller Scanner: bereinigte Yahoo-Kurse und aktuelle Mitgliederlisten.</span><button data-view="methodik" class="text-link">Details zur Datenbasis →</button></div>
+            <p class="result-bottom-note" id="free-update-status" role="status"></p>
           </section>
 
           <section class="view" id="view-backtests">
@@ -128,7 +130,7 @@
           </section>
 
           <section class="view" id="view-methodik">
-            <div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRANSPARENZ</div><h1>Methodik &amp; Daten</h1><p class="lede">Was dieses Werkzeug misst — und wo seine Aussagekraft endet.</p></div><div class="snapshot-stamp"><span class="stamp-icon">◎</span><span><small>DATENQUELLE</small><strong>Norgate lokal</strong></span></div></div>
+            <div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRANSPARENZ</div><h1>Methodik &amp; Daten</h1><p class="lede">Was dieses Werkzeug misst — und wo seine Aussagekraft endet.</p></div><div class="snapshot-stamp"><span class="stamp-icon">◎</span><span><small>DATENQUELLEN</small><strong>Norgate + Yahoo</strong></span></div></div>
             <div class="method-grid">
               <article class="panel method-card method-card-wide"><div class="method-number">01</div><div><div class="eyebrow">DIE FRAGE</div><h2>Ist ein Einstieg nahe dem Jahreshoch vorteilhaft?</h2><p>Das Projekt untersucht, wie sich Aktien nach einem Schlusskurs nahe ihrem höchsten Tageshoch aus den letzten 252 Handelssitzungen entwickelt haben. Es berechnet keine Momentum-Scores, Signale oder Rankings aus einem anderen Projekt.</p></div></article>
               <article class="panel method-card"><div class="method-number">02</div><div><div class="eyebrow">52-WOCHEN-HOCH</div><h2>252 Handelssitzungen</h2><p>Für jeden Stichtag wird das Maximum der adjustierten Tageshochs aus den letzten 252 Indexsitzungen einschließlich des Stichtags verwendet. Der Abstand lautet: Schlusskurs ÷ 52W-Hoch − 1.</p></div></article>
@@ -136,6 +138,7 @@
               <article class="panel method-card"><div class="method-number">04</div><div><div class="eyebrow">VERGLEICHSGRUPPE</div><h2>Gleicher Index, gleicher Termin</h2><p>Als grobe Kontrolle dienen Mitglieder desselben Index am selben Signaltermin, deren Schlusskurs 15–25 % unter dem jeweiligen 52W-Hoch liegt. Der Bereich lässt sich ändern. Diese Gruppe ist nicht risikogleich und beweist keine Kausalität.</p></div></article>
               <article class="panel method-card"><div class="method-number">05</div><div><div class="eyebrow">KOSTEN</div><h2>Je Seite abgezogen</h2><p>Die gewählten Basispunkte werden beim Kauf und Verkauf berücksichtigt. Steuern, tatsächliche Geld-Brief-Spannen, Slippage, Finanzierung und die Stückzahl realer Aktien werden nicht rekonstruiert.</p></div></article>
               <article class="panel method-card method-card-wide source-method"><div class="method-number">06</div><div><div class="eyebrow">QUELLE &amp; GRENZEN</div><h2>Norgate Total Return — mit sichtbaren Einschränkungen</h2><p>Kurse und historische Indexmitgliedschaften stammen aus der lokalen Norgate-SQLite-Datei. Das Exportmanifest ist als unvollständig markiert; fehlende Kurse oder Indexmitglieder können daher Ergebnisse verzerren. Die App zählt ausgeschlossene Werte und zeigt Datenwarnungen. Point-in-Time-Mitgliedschaften sind die in dieser Datei gespeicherten Stände; frühere Datenrevisionen sind nicht archiviert.</p><p>Die Total-Return-adjustierten OHLC-Werte sind synthetische Referenzpreise und keine Rekonstruktion tatsächlich gehandelter Stücke. Dividendenzahlungen, Splits und Ausführungen im realen Markt werden nicht einzeln nachgebildet. Überlappende Signale sind nicht unabhängig; alle Kennzahlen sind deskriptiv, ohne Out-of-Sample-Nachweis.</p></div></article>
+              <article class="panel method-card method-card-wide"><div class="method-number">07</div><div><div class="eyebrow">KOSTENLOSE AKTUALISIERUNG</div><h2>Aktueller Scanner mit eigenem Cache</h2><p>Aktuelle Schlusskurse stammen von Yahoo Finance. Alle OHLC-Werte des gesamten Analysefensters werden mit Adj Close ÷ Close bereinigt und gemeinsam erneuert, damit Dividenden oder Splits keinen Bruch innerhalb des Fensters erzeugen. Es werden nur abgeschlossene US-Handelstage mit zwei Stunden Bereitstellungspuffer verwendet.</p><p>Nasdaq liefert eine aktuell beobachtete Mitgliederliste; SPY- und DIA-Bestände von State Street dienen als Proxy für S&amp;P 500 und Dow. Abrufzeit, Holdings-Stichtag und Originaldaten werden archiviert. Diese Listen ersetzen keine verifizierten historischen Mitgliedschaften. Der kostenlose Cache dient dem aktuellen Scanner; Backtests und Optimierungen verwenden weiterhin ausschließlich Norgate. Fehlende oder zu kurze Kursreihen werden ausgeschlossen.</p><p>Während die App läuft, prüft sie beim Start und danach stündlich auf eine neue abgeschlossene Session. Bei fehlgeschlagener Prüfung bleibt der bisherige Cache erhalten. Mit „Kurse aktualisieren“ lässt sich ein erneuter Abruf starten.</p></div></article>
             </div>
             <div class="independence-note"><span>⌂</span><div><strong>Eigenständige Anwendung</strong><p>Dieses Projekt liest die Norgate-Datenbank ausschließlich im Nur-Lesen-Modus. Ergebnisse und Einstellungen werden in einer separaten lokalen Datenbank gespeichert.</p><code id="source-file-label">Datenquelle: wird geladen …</code></div></div>
           </section>

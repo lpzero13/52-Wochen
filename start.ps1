@@ -33,8 +33,8 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 & $venvPython -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'
 if ($LASTEXITCODE -ne 0) { throw '52W High Research benötigt Python 3.11 oder neuer.' }
 
-$sitePackages = Join-Path $projectRoot '.venv\Lib\site-packages'
-if (-not (Test-Path -LiteralPath (Join-Path $sitePackages 'fastapi')) -or -not (Test-Path -LiteralPath (Join-Path $sitePackages 'uvicorn')) -or -not (Test-Path -LiteralPath (Join-Path $sitePackages 'mcp'))) {
+& $venvPython -c 'import importlib.util; raise SystemExit(0 if all(importlib.util.find_spec(name) for name in ("fastapi", "uvicorn", "mcp", "yfinance", "pandas", "openpyxl", "exchange_calendars", "scipy", "sklearn", "tzdata")) else 1)'
+if ($LASTEXITCODE -ne 0) {
     Write-Host 'Installiere die benötigten Projektpakete …'
     $pipOut = Join-Path $varDir 'pip-install.log'
     $pipErr = Join-Path $varDir 'pip-install-error.log'
@@ -88,5 +88,5 @@ if (-not $ready) {
 }
 
 Write-Host "52W High Research läuft unter $url"
-Write-Host 'Die Norgate-Datenquelle und ihre Einschränkungen werden in der App angezeigt.'
+Write-Host 'Norgate-Historie und kostenloser aktueller Scanner-Cache werden getrennt in der App angezeigt.'
 if (-not $NoBrowser) { Start-Process $url }

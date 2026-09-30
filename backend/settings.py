@@ -29,5 +29,9 @@ NORGATE_DB_PATH = Path(os.environ.get("NORGATE_DB_PATH", DEFAULT_NORGATE_PATH)).
 SCANNER_DB_PATH = Path(os.environ.get("SCANNER_DB_PATH", "var/52w_scanner.sqlite"))
 if not SCANNER_DB_PATH.is_absolute():
     SCANNER_DB_PATH = (PROJECT_ROOT / SCANNER_DB_PATH).resolve()
+LIVE_DATA_DIR = Path(os.environ.get("LIVE_DATA_DIR", "var/live")).expanduser()
+if not LIVE_DATA_DIR.is_absolute():
+    LIVE_DATA_DIR = (PROJECT_ROOT / LIVE_DATA_DIR).resolve()
+LIVE_AUTO_UPDATE = os.environ.get("LIVE_AUTO_UPDATE", "true").lower() in {"true", "1", "yes"}
 WEB_ROOT = PROJECT_ROOT / "web"
 PORT = int(os.environ.get("PORT", "8020"))

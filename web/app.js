@@ -88,7 +88,9 @@ function setDefaultDateInputs() {
   if (!state.source) return;
   const universe = document.querySelector("#universe-select").value;
   const sourceDates = selectedUniverseDates(universe);
-  const latest = sourceDates?.end_date || state.source.end_date;
+  const historyLatest = sourceDates?.end_date || state.source.end_date;
+  const liveLatest = state.source.live?.universes?.find((item) => item.code === universe)?.end_date;
+  const latest = liveLatest && liveLatest > (historyLatest || "") ? liveLatest : historyLatest;
   const earliest = sourceDates?.start_date || state.source.start_date;
   const screenDate = document.querySelector("#as-of-date");
   screenDate.min = earliest || "";
@@ -97,12 +99,12 @@ function setDefaultDateInputs() {
 
   const endInput = document.querySelector("#bt-end-date");
   const startInput = document.querySelector("#bt-start-date");
-  endInput.max = latest || "";
+  endInput.max = historyLatest || "";
   startInput.min = earliest || "";
-  startInput.max = latest || "";
-  if (!endInput.value || endInput.value > latest) endInput.value = latest || "";
-  if (!startInput.value && latest) {
-    const end = new Date(`${latest}T00:00:00Z`);
+  startInput.max = historyLatest || "";
+  if (!endInput.value || endInput.value > historyLatest) endInput.value = historyLatest || "";
+  if (!startInput.value && historyLatest) {
+    const end = new Date(`${historyLatest}T00:00:00Z`);
     end.setUTCFullYear(end.getUTCFullYear() - 10);
     const proposed = end.toISOString().slice(0, 10);
     startInput.value = proposed < (earliest || proposed) ? (earliest || proposed) : proposed;
@@ -116,9 +118,12 @@ async function loadStatus() {
     const source = await api("/api/status");
     state.source = source;
     indicator.classList.remove("error");
-    indicator.classList.toggle("limited", source.quality_status !== "available");
-    indicator.querySelector("span").textContent = source.quality_status === "available" ? `Daten bis ${formatDate(source.end_date)}` : `Daten eingeschränkt · bis ${formatDate(source.end_date)}`;
-    document.querySelector("#source-file-label").textContent = `Datenquelle: ${source.database_path} · Anpassung: ${source.price_adjustment} · Export vollständig: ${source.manifest_complete ? "ja" : "nein / unbekannt"}`;
+    const current = source.live?.available ? source.live : source;
+    indicator.classList.toggle("limited", current.quality_status !== "available");
+    indicator.querySelector("span").textContent = `Scanner bis ${formatDate(source.screen_end_date)} · Historie bis ${formatDate(source.historical?.end_date)}`;
+    document.querySelector("#source-file-label").textContent = `Historie: ${source.historical?.database_path || "nicht verfügbar"} · aktueller Cache: ${source.live?.database_path || "noch nicht vorhanden"}`;
+    document.querySelector("#free-update-status").textContent = source.update?.message || "";
+    if (source.update?.status === "running") scheduleUpdatePoll();
     if (source.warnings?.length) {
       setAlert(source.warnings.join(" "));
     } else {
@@ -152,12 +157,14 @@ async function loadScreener() {
     const effective = state.screener.as_of_date;
     const note = document.querySelector("#effective-date-note");
     if (requested && requested !== effective) {
-      note.textContent = `Für den gewählten Stichtag ${formatDate(requested)} gab es keine Indexsession. Angezeigt wird die letzte vorherige Session: ${formatDate(effective)}.`;
+      note.textContent = `Gewählter Stichtag: ${formatDate(requested)}. Der letzte verfügbare Datenstand davor ist ${formatDate(effective)}; neuere Kurse können noch fehlen oder die Börse war geschlossen.`;
       note.classList.remove("hidden");
     } else {
       note.classList.add("hidden");
     }
     document.querySelector("#snapshot-stamp").textContent = formatDate(effective);
+    document.querySelector("#member-basis").textContent = state.screener.data_source === "live" ? "aktuelle Mitgliederliste" : "historische Indexmitglieder";
+    document.querySelector("#screen-price-basis").textContent = `${state.screener.data_source === "live" ? "Aktueller Scanner · Yahoo Finance" : "Historischer Scanner · Norgate"} · ${state.screener.price_basis}. 252 Handelssitzungen; fehlende Kursreihen werden ausgeschlossen.`;
     if (state.screener.warnings?.length) setAlert(state.screener.warnings.join(" "));
   } catch (error) {
     tbody.innerHTML = `<tr><td colspan="9" class="empty-state">${esc(error.message)}</td></tr>`;
@@ -263,7 +270,7 @@ async function openDetail(assetId) {
   container.className = "drawer-loading";
   container.innerHTML = '<span class="loader"></span> Kursverlauf wird geladen …';
   try {
-    const params = new URLSearchParams({ universe: result.universe, as_of_date: result.as_of_date, threshold_pct: String(result.threshold_pct) });
+    const params = new URLSearchParams({ universe: result.universe, as_of_date: result.as_of_date, threshold_pct: String(result.threshold_pct), data_source: result.data_source || "auto" });
     const detail = await api(`/api/securities/${assetId}?${params}`);
     container.className = "";
     const metrics = detail.metrics;
@@ -474,6 +481,44 @@ function attachListeners() {
   document.querySelector("#detail-backdrop").addEventListener("click", (event) => { if (event.target.id === "detail-backdrop") close(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
   document.querySelector("#refresh-button").addEventListener("click", async () => { await loadStatus(); await loadScreener(); showToast("Datenansicht aktualisiert."); });
+  document.querySelector("#free-update-button").addEventListener("click", refreshFreeData);
+}
+
+let updatePollTimer;
+function scheduleUpdatePoll() {
+  window.clearTimeout(updatePollTimer);
+  updatePollTimer = window.setTimeout(async () => {
+    try {
+      const update = await api("/api/data/update");
+      document.querySelector("#free-update-status").textContent = update.message || "";
+      if (update.status === "running") {
+        scheduleUpdatePoll();
+      } else {
+        document.querySelector("#free-update-button").disabled = false;
+        await loadStatus();
+        if (["published", "up_to_date"].includes(update.status)) {
+          document.querySelector("#as-of-date").value = state.source?.screen_end_date || "";
+          await loadScreener();
+        }
+      }
+    } catch (error) {
+      document.querySelector("#free-update-status").textContent = error.message;
+      document.querySelector("#free-update-button").disabled = false;
+    }
+  }, 3000);
+}
+
+async function refreshFreeData() {
+  const button = document.querySelector("#free-update-button");
+  button.disabled = true;
+  try {
+    const update = await api("/api/data/update?force=true", { method: "POST" });
+    document.querySelector("#free-update-status").textContent = update.message;
+    scheduleUpdatePoll();
+  } catch (error) {
+    document.querySelector("#free-update-status").textContent = error.message;
+    button.disabled = false;
+  }
 }
 
 async function init() {

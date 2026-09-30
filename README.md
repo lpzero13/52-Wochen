@@ -1,6 +1,6 @@
 # 52W High Research
 
-Ein eigenständiges lokales Research-Werkzeug zur Frage, wie Aktien nach einem Signal nahe ihrem 52-Wochen-Hoch abgeschnitten haben. Es greift lesend auf die vorhandene Norgate-SQLite-Datenbank zu und speichert Studien in einer separaten lokalen Datenbank.
+Ein eigenständiges lokales Research-Werkzeug zur Frage, wie Aktien nach einem Signal nahe ihrem 52-Wochen-Hoch abgeschnitten haben. Historische Studien lesen die vorhandene Norgate-SQLite-Datenbank. Der aktuelle Scanner lädt kostenlose Schlusskurse und aktuelle Mitgliederlisten in einen eigenen Cache; Studien bleiben in einer separaten lokalen Datenbank.
 
 ## Start
 
@@ -17,6 +17,29 @@ Setze `NORGATE_DB_PATH` in `.env` auf den Speicherort deiner Norgate-Datei. Ohne
 - **Wertpapierdetails:** Preisverlauf über 252 Sitzungen, rollierendes Hoch/Tief, Abstand und 1/3/6/12-Monatsrenditen.
 - **Backtests:** einstellbare Signalabstände, tägliche/wöchentliche/monatliche Termine, 21/63/126/252 Sitzungen Haltedauer, Vergleichsgruppe und Kosten; Studien bleiben lokal gespeichert und Ereignisse können als CSV geladen werden.
 - **Methodik & Daten:** Definitionen, Quelldatenstatus und Grenzen der Aussagekraft.
+
+## Kostenlos aktuell halten
+
+Die App prüft beim Start und danach stündlich, ob eine neue abgeschlossene US-Handelssession vorliegt (`LIVE_AUTO_UPDATE=true`). Sie lädt dann Kurse über [yfinance](https://ranaroussi.github.io/yfinance/reference/api/yfinance.download.html), Nasdaq-100-Mitglieder von [Nasdaq](https://www.nasdaq.com/products/global-indexes/nasdaq-100/companies) sowie die datierten [SPY](https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx)- und [DIA](https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx)-Bestände von State Street. SPY/DIA dienen als Mitglieder-Proxy, keine offizielle historische Indexdatei. Kein API-Schlüssel erforderlich. Yahoo ist eine inoffizielle Quelle ohne garantierte Verfügbarkeit; yfinance ist für persönliche Research-Nutzung vorgesehen.
+
+Mit **Kurse aktualisieren** wird ein erneuter Abruf gestartet. Alternativ in PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.live
+# Bestehenden Tagesstand erneut abrufen, etwa nach einer Datenlücke:
+.\.venv\Scripts\python.exe -m backend.live --force
+```
+
+- `LIVE_DATA_DIR` bestimmt den Speicherort (Standard `var/live`). `current.sqlite` enthält das aktuelle Scannerfenster. `archive/<run_id>/` enthält Originalmitgliederlisten, Abrufzeitpunkte, Hashes, komprimierte Yahoo-Kurse und das Prüfmanifest. Das Archiv wächst mit den Abrufen.
+- Etwa zwei Jahre Yahoo-Kurse werden pro Aktualisierung als vollständiges Fenster neu geladen. OHLC werden gemeinsam mit `Adj Close / Close` bereinigt; Yahoo-Splits werden nicht doppelt angewendet. Das verhindert gemischte Bereinigungsstände bei späteren Dividenden oder Splits. Norgate- und Yahoo-Preisreihen werden nicht aneinandergehängt.
+- Der NYSE-Kalender berücksichtigt Feiertage und verkürzte Handelstage. Es werden nur Sessions verwendet, deren Börsenschluss mindestens zwei Stunden zurückliegt. State-Street-Holdings müssen denselben Stichtag haben. Wenn der Anbieter noch nicht aktuell ist, bleibt der bisherige Stand erhalten und die App versucht es bei der nächsten stündlichen Prüfung erneut.
+- Mindestens 95 % der Mitglieder je Universum müssen aktuelle gültige Kurse haben. Fehlende Reihen bleiben als gezählte Ausschlüsse sichtbar. Für 52W-Kennzahlen sind weiterhin vollständige 252 Indexsessions erforderlich; junge Börsenneulinge sind häufig noch nicht auswertbar.
+- Ein veröffentlichter Tagesstand wird automatisch nur einmal abgerufen. Auch ein veröffentlichter Stand mit kleinen Kurslücken wird erst auf Benutzeranforderung (`--force` bzw. Update-Knopf) erneut geladen. Größere Fehler verhindern die Veröffentlichung; der letzte brauchbare Cache bleibt erhalten. Veröffentlichung erfolgt in einer SQLite-Transaktion; parallele Updates sind durch eine Betriebssystem-Sperre ausgeschlossen.
+- Automatische Updates laufen **nur während die App läuft und der Rechner wach ist**. Der nächste App-Start holt einen fehlenden aktuellen Stand nach. Für einen dauerhaft laufenden Server genügt dieser eingebaute Mechanismus; ein Windows-Aufgabenplaner könnte später den CLI-Aufruf auch bei geschlossener App ausführen.
+
+**Survivorship Bias:** Historische Screens, Backtests und Optimierungen verwenden weiterhin nur die historischen Norgate-Mitglieder und -Kurse. Der kostenlose Cache bietet ausschließlich den aktuellen Snapshot. Heutige Nasdaq-Mitglieder werden nicht für frühere Sessions eingetragen. Zwischen Norgate-Ende und aktuellem Snapshot werden historische Screens ohne verifizierte Mitgliederliste abgelehnt. Die Originalbeobachtungen werden ab jetzt archiviert, machen aber fehlende Vergangenheit, Delisting-Renditen oder historische Tickerwechsel nicht automatisch vollständig. Der Zustand der eingebundenen Norgate-Datei wird aus ihrem Exportmanifest angezeigt; etwaige historische Lücken müssen im Norgate-Import repariert werden.
+
+REST: `POST /api/data/update?force=true` startet einen Abruf, `GET /api/data/update` zeigt den Fortschritt. `/api/status` zeigt getrennte Felder `historical`, `live`, `screen_end_date` und `update`; das bisherige `end_date` bleibt der historische Datenstand. Screener und Wertpapierdetails akzeptieren `data_source=auto|historical|live`; `auto` wählt aktuelle kostenlose Daten für den neuesten Stand und Norgate für historische Stichtage. Hermes kann mit `update_free_market_data` einen Abruf starten und ihn mit `get_data_status` verfolgen. Die REST-/MCP-Backtest-Werkzeuge verwenden ausschließlich Norgate.
 
 ## Nutzung durch Hermes Agent
 
@@ -68,6 +91,6 @@ Das Optimierungsziel kann auch auf mittlere oder mediane Nettorendite, Anteil po
 
 Der Backtest ist eine Ereignisstudie. Das Signal wird zum Tagesschluss erkannt, der Referenzeinstieg erfolgt am nächsten Open und der spätere Referenzausstieg am Close. Die Anzeige zeigt Ereignisrenditen und vergleicht sie mit einer groben Gruppe derselben Indextermine, die weiter unter dem Hoch lag. Sie simuliert kein zusammengesetztes Depot. Überlappende und wiederholte Signale sind nicht unabhängig.
 
-Norgate liefert hier Total-Return-adjustierte OHLC-Preise. Die Norgate-Datenbank wird nicht verändert. Das Ergebnisverzeichnis `var` enthält ausschließlich den getrennten Zustand dieses Projekts.
+Norgate liefert für historische Studien Total-Return-adjustierte OHLC-Preise. Der aktuelle Scanner verwendet separat bereinigte Yahoo-OHLC-Preise. Die Norgate-Datenbank wird nicht verändert. Das Verzeichnis `var` enthält den getrennten Zustand und kostenlosen Cache dieses Projekts.
 
 Weitere Spezifikation: [SPEC.md](SPEC.md).

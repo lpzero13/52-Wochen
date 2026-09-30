@@ -10,24 +10,29 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import storage
+from . import live, storage
 from .models import BacktestRequest, OptimizationRequest
 from .optimizer import optimize_event_studies
 from .research import ResearchError, run_event_study, screener, security_detail
-from .settings import WEB_ROOT
-from .source import SourceError, open_source, source_status
+from .settings import LIVE_AUTO_UPDATE, WEB_ROOT
+from .source import SnapshotDateError, SourceError, data_status, open_screen_source, open_source
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     storage.initialize()
-    yield
+    stop = live.start_auto_updates() if LIVE_AUTO_UPDATE else None
+    try:
+        yield
+    finally:
+        if stop:
+            stop.set()
 
 
 app = FastAPI(
     title="52W High Research",
     description="Eigenständiges Research zu Aktien nahe ihrem 52-Wochen-Hoch.",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -40,10 +45,19 @@ def health() -> dict[str, bool]:
 @app.get("/api/status")
 def status() -> dict:
     try:
-        with open_source() as connection:
-            return source_status(connection)
+        return data_status()
     except SourceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/data/update", status_code=202)
+def update_free_data(force: bool = False) -> dict:
+    return live.start_refresh(force=force)
+
+
+@app.get("/api/data/update")
+def free_update_status() -> dict:
+    return live.update_status()
 
 
 @app.get("/api/screener")
@@ -51,16 +65,17 @@ def get_screener(
     universe: Literal["nasdaq100", "sp500", "dow"] = "sp500",
     as_of_date: Date | None = None,
     threshold_pct: float = Query(default=5, ge=0, le=25),
+    data_source: Literal["auto", "historical", "live"] = "auto",
 ) -> dict:
     try:
-        with open_source() as connection:
+        with open_screen_source(universe, as_of_date.isoformat() if as_of_date else None, data_source) as connection:
             return screener(
                 connection,
                 universe,
                 as_of_date.isoformat() if as_of_date else None,
                 threshold_pct,
             )
-    except ResearchError as exc:
+    except (ResearchError, SnapshotDateError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SourceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -72,9 +87,10 @@ def get_security(
     universe: Literal["nasdaq100", "sp500", "dow"] = "sp500",
     as_of_date: Date | None = None,
     threshold_pct: float = Query(default=5, ge=0, le=25),
+    data_source: Literal["auto", "historical", "live"] = "auto",
 ) -> dict:
     try:
-        with open_source() as connection:
+        with open_screen_source(universe, as_of_date.isoformat() if as_of_date else None, data_source) as connection:
             return security_detail(
                 connection,
                 universe,
@@ -82,7 +98,7 @@ def get_security(
                 as_of_date.isoformat() if as_of_date else None,
                 threshold_pct,
             )
-    except ResearchError as exc:
+    except (ResearchError, SnapshotDateError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except SourceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

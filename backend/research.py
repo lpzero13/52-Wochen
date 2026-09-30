@@ -193,6 +193,8 @@ def screener(connection, universe: str, requested_date: str | None, threshold_pc
         )
     return {
         "universe": universe,
+        "data_source": read_metadata(connection).get("source_kind", "historical"),
+        "price_basis": read_metadata(connection).get("price_adjustment", "unbekannt"),
         "universe_label": str(UNIVERSES[universe]["label"]),
         "requested_date": requested_date,
         "as_of_date": effective_date,
@@ -205,7 +207,7 @@ def screener(connection, universe: str, requested_date: str | None, threshold_pc
         "rows": rows_out,
         "excluded": excluded[:100],
         "warnings": warnings,
-        "methodology": "52-Wochen-Hoch = höchster Total-Return-OHLC-Hochwert aus den letzten 252 Sessions einschließlich Stichtag.",
+        "methodology": "52-Wochen-Hoch = höchster bereinigter OHLC-Hochwert aus den letzten 252 Sessions einschließlich Stichtag. Preisbasis: " + read_metadata(connection).get("price_adjustment", "unbekannt"),
     }
 
 
@@ -236,6 +238,8 @@ def security_detail(connection, universe: str, asset_id: int, requested_date: st
     record = _security_record(connection, asset_id)
     return {
         "security_id": asset_id,
+        "data_source": read_metadata(connection).get("source_kind", "historical"),
+        "price_basis": read_metadata(connection).get("price_adjustment", "unbekannt"),
         "ticker": member["symbol_at_load_time"] or (record["current_symbol"] if record else f"Asset {asset_id}"),
         "name": member["security_name"] or (record["security_name"] if record else "Unbekannt"),
         "sector": (record.get("gics_sector") if record else None) or "—",
@@ -328,6 +332,8 @@ def _select_summary_events(events: list[dict[str, Any]], threshold: float) -> li
 
 
 def run_event_study(connection, params: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if read_metadata(connection).get("source_kind") == "live":
+        raise ResearchError("Der kostenlose aktuelle Snapshot ist keine historische Backtest-Quelle.")
     universe = str(params["universe"])
     if universe not in UNIVERSES:
         raise ResearchError("Unbekanntes Universum.")

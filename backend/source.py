@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -28,16 +29,20 @@ class SourceError(RuntimeError):
     """Lesbare Meldung bei nicht erreichbarer oder inkompatibler Quelldatenbank."""
 
 
+class SnapshotDateError(SourceError):
+    """Keine belegte Mitgliedschaft für einen gewünschten historischen Stichtag."""
+
+
 def database_path() -> Path:
     return NORGATE_DB_PATH
 
 
 @contextmanager
-def open_source() -> Iterator[sqlite3.Connection]:
-    path = database_path()
+def open_source(path: Path | None = None) -> Iterator[sqlite3.Connection]:
+    path = path or database_path()
     if not path.is_file():
         raise SourceError(
-            f"Norgate-Datenbank nicht gefunden: {path}. Bitte NORGATE_DB_PATH in .env prüfen."
+            f"Quelldatenbank nicht gefunden: {path}. Bitte Datenpfad und Aktualisierungsstatus prüfen."
         )
     try:
         uri = f"{path.resolve().as_uri()}?mode=ro"
@@ -45,9 +50,15 @@ def open_source() -> Iterator[sqlite3.Connection]:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA query_only = ON")
         connection.execute("PRAGMA busy_timeout = 20000")
+        connection.execute("BEGIN")
         validate_schema(connection)
     except sqlite3.Error as exc:
-        raise SourceError(f"Die Norgate-Datei kann nicht gelesen werden: {exc}") from exc
+        if 'connection' in locals():
+            connection.close()
+        raise SourceError(f"Die Quelldatei kann nicht gelesen werden: {exc}") from exc
+    except SourceError:
+        connection.close()
+        raise
     try:
         yield connection
     finally:
@@ -80,7 +91,8 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
         with open_source() as opened:
             return source_status(opened)
 
-    path = database_path()
+    file_row = connection.execute("PRAGMA database_list").fetchone()
+    path = Path(file_row[2]) if file_row and file_row[2] else database_path()
     try:
         file_stat = path.stat()
         modified = datetime.fromtimestamp(file_stat.st_mtime, timezone.utc).isoformat()
@@ -89,6 +101,7 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
         modified, bytes_size = None, None
 
     metadata = read_metadata(connection)
+    is_live = metadata.get("source_kind") == "live"
     complete = metadata.get("manifest_is_complete", "unknown").strip().lower() in {"true", "1", "yes"}
     table_counts = {
         str(row["table_name"]): int(row["row_count"])
@@ -96,7 +109,9 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
     }
     universes: list[dict[str, object]] = []
     warnings: list[str] = []
-    if not complete:
+    if is_live:
+        warnings.extend(json.loads(metadata.get("warnings", "[]")))
+    elif not complete:
         warnings.append("Das Norgate-Exportmanifest kennzeichnet den Datenbankexport als unvollständig.")
 
     all_dates: list[str] = []
@@ -119,7 +134,9 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
             all_dates.append(str(end_date))
         expected = int(definition["expected_members"])
         universe_warning = None
-        if end_date and members != expected:
+        # An index can hold multiple share classes of one company.
+        upper = {"sp500": 510, "nasdaq100": 105, "dow": 30}[code]
+        if end_date and not expected <= members <= upper:
             universe_warning = (
                 f"{definition['label']}: {members} Mitglieder am letzten Stichtag; "
                 f"der Index umfasst üblicherweise etwa {expected}."
@@ -143,6 +160,7 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
 
     return {
         "available": True,
+        "source_kind": "live" if is_live else "historical",
         "database_path": str(path),
         "database_name": path.name,
         "database_bytes": bytes_size,
@@ -151,6 +169,7 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
         "price_adjustment": metadata.get("price_adjustment", "unbekannt"),
         "manifest_complete": complete,
         "manifest_updated_at": metadata.get("manifest_last_updated_at"),
+        "membership_sources": json.loads(metadata.get("membership_sources", "{}")),
         "start_date": min((str(u["start_date"]) for u in universes if u["start_date"]), default=None),
         "end_date": max(all_dates, default=None),
         "security_count": table_counts.get("securities"),
@@ -160,6 +179,74 @@ def source_status(connection: sqlite3.Connection | None = None) -> dict[str, obj
         "warnings": warnings,
         "universes": universes,
     }
+
+
+def data_status() -> dict[str, object]:
+    from .live import live_database_path, update_status
+
+    statuses = {}
+    for kind, path in (("historical", database_path()), ("live", live_database_path())):
+        try:
+            with open_source(path) as connection:
+                statuses[kind] = source_status(connection)
+        except SourceError as exc:
+            statuses[kind] = {"available": False, "message": str(exc), "universes": []}
+    historical, live = statuses["historical"], statuses["live"]
+    if not historical["available"] and not live["available"]:
+        raise SourceError(str(historical["message"]))
+    base = historical if historical["available"] else live
+    return {
+        **base, **statuses,
+        "screen_end_date": max(filter(None, (historical.get("end_date"), live.get("end_date"))), default=None),
+        "update": update_status(),
+    }
+
+
+@contextmanager
+def open_screen_source(universe: str, requested_date: str | None, data_source: str = "auto") -> Iterator[sqlite3.Connection]:
+    from .live import live_database_path
+
+    if universe not in UNIVERSES or data_source not in {"auto", "historical", "live"}:
+        raise SourceError("Unbekanntes Universum oder Datenquelle.")
+    if data_source == "historical":
+        with open_source() as connection:
+            yield connection
+        return
+    live_path = live_database_path()
+    historic_end = None
+    if database_path().is_file():
+        with open_source() as connection:
+            historic_end = connection.execute("SELECT MAX(date) FROM indices WHERE universe = ?", (universe,)).fetchone()[0]
+    if data_source == "auto" and requested_date and historic_end and requested_date > historic_end:
+        import exchange_calendars as xc
+        try:
+            last_session = xc.get_calendar("XNYS").date_to_session(requested_date, direction="previous").date().isoformat()
+        except (ValueError, OverflowError) as exc:
+            raise SnapshotDateError("Der gewünschte Stichtag liegt außerhalb des verfügbaren Börsenkalenders.") from exc
+        if last_session <= historic_end:
+            with open_source() as connection:
+                yield connection
+            return
+    if live_path.is_file():
+        with open_source(live_path) as live_connection:
+            live_end = read_metadata(live_connection).get("snapshot_date")
+            use_live = data_source == "live" or (
+                live_end and (not historic_end or live_end > historic_end)
+                and (not requested_date or not historic_end or requested_date > historic_end)
+            )
+            if use_live:
+                if requested_date and live_end and requested_date < live_end:
+                    raise SnapshotDateError(
+                        f"Für {requested_date} fehlen verifizierte historische Indexmitglieder nach dem Norgate-Ende. "
+                        f"Der kostenlose Scanner bietet den aktuellen Snapshot {live_end}. "
+                        "Die heutige Mitgliederliste wird nicht rückwirkend als historische Liste verwendet."
+                    )
+                yield live_connection
+                return
+    if data_source == "live":
+        raise SourceError("Noch kein kostenloser Scanner-Cache vorhanden. Bitte Daten aktualisieren.")
+    with open_source() as connection:
+        yield connection
 
 
 def session_dates(connection: sqlite3.Connection, universe: str) -> list[str]:

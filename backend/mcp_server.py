@@ -6,11 +6,11 @@ from typing import Any, Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
 
-from . import storage
+from . import live, storage
 from .models import BacktestRequest, OptimizationRequest
 from .optimizer import optimize_event_studies
 from .research import ResearchError, run_event_study, screener, security_detail
-from .source import SourceError, open_source, session_dates, source_status
+from .source import SourceError, data_status, open_screen_source, open_source, session_dates
 
 
 mcp = FastMCP(
@@ -48,12 +48,17 @@ def _requested_date(value: str | None) -> str | None:
 
 @mcp.tool()
 def get_data_status() -> dict[str, Any]:
-    """Zeigt Norgate-Datenstand, verfügbare Universen und Datenwarnungen an."""
+    """Zeigt Norgate-Historie, kostenlosen Scanner-Cache und Aktualisierungsstatus."""
     try:
-        with open_source() as connection:
-            return source_status(connection)
+        return data_status()
     except SourceError as exc:
         raise ValueError(str(exc)) from exc
+
+
+@mcp.tool()
+def update_free_market_data(force: bool = False) -> dict[str, Any]:
+    """Startet kostenloses EOD-Update; Fortschritt mit get_data_status abfragen."""
+    return live.start_refresh(force=force)
 
 
 @mcp.tool()
@@ -62,13 +67,14 @@ def scan_near_52w_high(
     as_of_date: str | None = None,
     threshold_pct: float = 5,
     limit: int = 50,
+    data_source: Literal["auto", "historical", "live"] = "auto",
 ) -> dict[str, Any]:
     """Listet Aktien nahe ihrem 52-Wochen-Hoch heute oder an einem historischen Datum."""
     if not 1 <= limit <= 500:
         raise ValueError("limit muss zwischen 1 und 500 liegen.")
     as_of_date = _requested_date(as_of_date)
     try:
-        with open_source() as connection:
+        with open_screen_source(universe, as_of_date, data_source) as connection:
             result = screener(connection, universe, as_of_date, threshold_pct)
     except (ResearchError, SourceError) as exc:
         raise ValueError(str(exc)) from exc
@@ -84,11 +90,12 @@ def get_security_detail(
     universe: Literal["nasdaq100", "sp500", "dow"] = "sp500",
     as_of_date: str | None = None,
     threshold_pct: float = 5,
+    data_source: Literal["auto", "historical", "live"] = "auto",
 ) -> dict[str, Any]:
     """Liefert 252 Sitzungen Kursverlauf und Hoch-Abstand einer Indexaktie."""
     as_of_date = _requested_date(as_of_date)
     try:
-        with open_source() as connection:
+        with open_screen_source(universe, as_of_date, data_source) as connection:
             return security_detail(connection, universe, asset_id, as_of_date, threshold_pct)
     except (ResearchError, SourceError) as exc:
         raise ValueError(str(exc)) from exc
